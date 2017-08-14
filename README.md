@@ -8,13 +8,13 @@ This is a Pytorch implementation of [Get To The Point: Summarization with Pointe
 You require :
 
 1. [Pytorch](pytorch.org/) v0.2 with CUDA support
-2. [Visdom](https://github.com/facebookresearch/visdom/) visualization package for simple visualization of training progress.
+2. [Visdom](https://github.com/facebookresearch/visdom/) visualization package for easy monitoring of training progress in web browser
 3. tqdm for terminal-level progress updates
 
 ## How to get the data
 
-Download the fully-preprocessed data splits [here](https://github.com/JafferWilson/Process-Data-of-CNN-DailyMail) and save yourself the trouble of downloading CoreNLP for tokenization. 
-This implementation only uses the `Finised_Files` directory containing `train.bin`, `val.bin`, `test.bin` splits. 
+Download the fully-preprocessed data splits [here](https://github.com/JafferWilson/Process-Data-of-CNN-DailyMail) and save yourself the trouble of downloading CoreNLP and subsequent tokenization. 
+This implementation only uses the `Finised_Files` directory containing `train.bin`, `val.bin`, `test.bin` splits. Move these files to the `finished_files` directory.
 
 The only other file `vocabulary.bin` has already been provided in the `finished_files` in this repo. 
 
