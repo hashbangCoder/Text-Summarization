@@ -13,29 +13,28 @@ from visdom import Visdom
 parser = argparse.ArgumentParser()
 
 parser.add_argument("--train-file", dest="train_file", help="Path to train datafile", default='finished_files/train.bin', type=str)
-parser.add_argument("--test-file", dest="test_file", help="Path to train datafile", default='finished_files/test.bin', type=str)
+parser.add_argument("--test-file", dest="test_file", help="Path to test/eval datafile", default='finished_files/test.bin', type=str)
 parser.add_argument("--vocab-file", dest="vocab_file", help="Path to vocabulary datafile", default='finished_files/vocabulary.bin', type=str)
 
-parser.add_argument("--max-abstract-size", dest="max_abstract_size", default=140, type=int)
-parser.add_argument("--max-article-size", dest="max_article_size", default=400, type=int)
+parser.add_argument("--max-abstract-size", dest="max_abstract_size", help="Maximum size of abstract for decoder input", default=110, type=int)
+parser.add_argument("--max-article-size", dest="max_article_size", help="Maximum size of article for encoder input", default=300, type=int)
 parser.add_argument("--num-epochs", dest="epochs", help="Number of epochs", default=10, type=int)
 parser.add_argument("--batch-size", dest="batchSize", help="Mini-batch size", default=32, type=int)
 parser.add_argument("--embed-size", dest="embedSize", help="Size of word embedding", default=300, type=int)
-parser.add_argument("--hidden-size", dest="hiddenSize", help="Size of hidden to model", default=256, type=int)
+parser.add_argument("--hidden-size", dest="hiddenSize", help="Size of hidden to model", default=128, type=int)
 
-
-parser.add_argument("--learning-rate", dest="lr", help="Learning Rate for RNN", default=0.001, type=float)
+parser.add_argument("--learning-rate", dest="lr", help="Learning Rate", default=0.001, type=float)
 parser.add_argument("--lambda", dest="lmbda", help="Hyperparameter for auxillary cost", default=1, type=float)
 parser.add_argument("--beam-size", dest="beam_size", help="beam size for beam search decoding", default=4, type=int)
 parser.add_argument("--max-decode", dest="max_decode", help="Maximum length of decoded output", default=40, type=int)
 parser.add_argument("--grad-clip", dest="grad_clip", help="Clip gradients of RNN model", default=2, type=float)
 parser.add_argument("--truncate-vocab", dest="trunc_vocab", help="size of truncated Vocabulary <= 50000 [to save memory]", default=50000, type=int)
 parser.add_argument("--bootstrap", dest="bootstrap", help="Bootstrap word embeds with GloVe?", default=0, type=int)
-parser.add_argument("--print-ground-truth", dest="print_ground_truth", help="Print the article and abstract", default=0, type=int)
+parser.add_argument("--print-ground-truth", dest="print_ground_truth", help="Print the article and abstract", default=1, type=int)
 
-parser.add_argument("--eval-freq", dest="eval_freq", help="How frequently (every mini-batch) to evaluate model", default=500, type=int)
-parser.add_argument("--load-model", dest="load_model", help="Load saved model", default=None, type=str)
-parser.add_argument("--save-dir", dest="save_dir", help="Directory to save trained models", default='Saved-Models', type=str)
+parser.add_argument("--eval-freq", dest="eval_freq", help="How frequently (every mini-batch) to evaluate model", default=20000, type=int)
+parser.add_argument("--save-dir", dest="save_dir", help="Directory to save trained models", default='Saved-Models/', type=str)
+parser.add_argument("--load-model", dest="load_model", help="Directory from which to load trained models", default=None, type=str)
 
 opt = parser.parse_args()
 vis = Visdom()
@@ -45,20 +44,19 @@ vis = Visdom()
 def evalModel(model):
     # set model to eval mode
     model.eval()
-    print '\n\n','*'*40, ' MODEL EVALUATION ', '*'*40
+    print '\n\n'
+    print '*'*30, ' MODEL EVALUATION ', '*'*30
 
     _article, _revArticle,  _extArticle, max_article_oov, article_oov, article_string, abs_string = dl.getEvalBatch()        
     _article = Variable(_article.cuda(), volatile=True)
     _extArticle = Variable(_extArticle.cuda(), volatile=True)
     _revArticle = Variable(_revArticle.cuda(), volatile=True)    
     all_summaries = model((_article, _revArticle, _extArticle), max_article_oov, decode_flag=True)
-        
     model.train()
     return all_summaries, article_string, abs_string, article_oov
 
 ### utility code for displaying generated abstract
-def displayOutput(all_summaries, article, abstract, article_oov, show_ground_truth=False):
-    
+def displayOutput(all_summaries, article, abstract, article_oov, show_ground_truth=False):    
     print '*' * 80
     print '\n'
     if show_ground_truth:
@@ -66,10 +64,20 @@ def displayOutput(all_summaries, article, abstract, article_oov, show_ground_tru
         print 'ACTUAL ABSTRACT : \n', abstract
     for i, summary in enumerate(all_summaries):    
         generated_summary = ' '.join([dl.id2word[ind] if ind<=dl.vocabSize else article_oov[ind % dl.vocabSize] for ind in summary])
-        print 'GENERATED ABSTRACT #%d : \n' %(i+1), generated_summary
-    
+        print 'GENERATED ABSTRACT #%d : \n' %(i+1), generated_summary    
     print '*' * 80
     return
+
+# Utility code to save model to disk
+def save_model(net, optimizer,all_summaries, article_string, abs_string):
+    save_dict = dict({'model': net.state_dict(), 'optim': optimizer.state_dict(), 'epoch': dl.epoch, 'iter':dl.iterInd, 'summaries':all_summaries, 'article':article_string, 'abstract_gold':abs_string})
+    print '\n','-' * 60
+    print 'Saving Model to : ', opt.save_dir
+    save_name = opt.save_dir + 'savedModel_E%d_%d.pth' % (dl.epoch, dl.iterInd)
+    torch.save(save_dict, save_name)
+    print '-' * 60  
+    return
+
 
 
 assert opt.trunc_vocab <= 50000, 'Invalid value for --truncate-vocab'
@@ -84,14 +92,14 @@ dl = dataloader.dataloader(opt.batchSize, opt.epochs, vocab, opt.train_file, opt
 
 
 if opt.bootstrap:
-    # bootstrap with pretrained embeddings
+    # bootstrap with pretrained embeddings    
     wordEmbed = torch.nn.Embedding(len(vocab) + 1, 300, 0)
     print 'Bootstrapping with pretrained GloVe word vectors...'
-    assert os.path.isfile('embeds_frequent.pkl'), 'Cannot find pretrained Word embeddings to bootstrap'
+    assert os.path.isfile('embeds.pkl'), 'Cannot find pretrained Word embeddings to bootstrap'
     with open('embeds.pkl', 'rb') as f:
         embeds = pickle.load(f)
     assert wordEmbed.weight.size() == embeds.size()
-    wordEmbed.weight.data = embeds
+    wordEmbed.weight.data[1:,:] = embeds
 else:
     # learn embeddings from scratch (default)
     wordEmbed = torch.nn.Embedding(len(vocab) + 1, opt.embedSize, 0)
@@ -101,20 +109,28 @@ net = models.SummaryNet(opt.embedSize, opt.hiddenSize, dl.vocabSize, wordEmbed,
                        start_id=dl.word2id['<go>'], stop_id=dl.word2id['<end>'], unk_id=dl.word2id['<unk>'],
                        max_decode=opt.max_decode, beam_size=opt.beam_size, lmbda=opt.lmbda)
 net = net.cuda()
-
 optimizer = torch.optim.Adam(net.parameters(), lr=opt.lr)
 
+if opt.load_model is not None and os.path.isfile(opt.load_model):
+    saved_file = torch.load(opt.load_model)
+    net.load_state_dict(saved_file['model'])
+    optimizer.load_state_dict(saved_file['optim'])
+    dl.epoch = saved_file['epoch']
+    dl.iterInd = saved_file['iter']
+    dl.pbar.update(dl.iterInd)        
+    print '\n','*'*30, 'RESUME FROM CHECKPOINT : %s' %opt.load_model,'*'*30
+    
+else:
+    print '\n','*'*30, 'START TRAINING','*'*30
 
-
+#dl.iterInd = 287226
+#dl.pbar.update(dl.iterInd)        
 all_loss = []
-print '\n','*'*30, 'START TRAINING','*'*30
 win = None
-
 ### Training loop'
 while dl.epoch <= opt.epochs:
     data_batch = dl.getBatch(opt.batchSize)
     batchArticles, batchExtArticles, batchRevArticles, batchAbstracts, batchTargets, _, _, max_article_oov, article_oov  = data_batch
-    
     # end of training/max epoch reached
     if data_batch is None:
         print '-'*50, 'END OF TRAINING', '-'*50
@@ -140,7 +156,7 @@ while dl.epoch <= opt.epochs:
     dl.pbar.update(opt.batchSize)        
     
     # save losses periodically
-    if dl.iterInd % 20:
+    if dl.iterInd % 50:
         all_loss.append(batch_loss.cpu().data.tolist()[0])
         title = 'Pointer Model with Coverage'        
         if win is None:
@@ -150,7 +166,12 @@ while dl.epoch <= opt.epochs:
                            ylabel='Train-Loss'))
     
     # evaluate model periodically
-    if dl.iterInd % opt.eval_freq <= opt.batchSize and dl.iterInd != 0:       
+    if dl.iterInd % opt.eval_freq < opt.batchSize and dl.iterInd > opt.batchSize:       
         all_summaries, article_string, abs_string, article_oov = evalModel(net)
         displayOutput(all_summaries, article_string, abs_string, article_oov, show_ground_truth=opt.print_ground_truth)
-        
+    
+    #if dl.epoch > 1 and dl.iterInd == 0:       
+        if dl.iterInd % (6*opt.eval_freq) < opt.batchSize and dl.iterInd > opt.batchSize:       
+            save_model(net, optimizer, all_summaries, article_string, abs_string)
+
+    del batch_loss, batchArticles, batchExtArticles, batchRevArticles, batchAbstracts, batchTargets
