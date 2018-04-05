@@ -1,8 +1,9 @@
 # Text-Summarization
 
-Text Summarization using Pointer Attention Models
+Text Summarization using Residual Logarithmic LSTMS. The model also uses Pointer Generator Network, Coverage, Reinforcement based learning and Attention Mechanism.
 
-This is a Pytorch implementation of [Get To The Point: Summarization with Pointer-Generator Networks by See et. al.](https://arxiv.org/abs/1704.04368)
+This is based on Pytorch implementation of [Get To The Point: Summarization with Pointer-Generator Networks by See et. al.](https://arxiv.org/abs/1704.04368), modified from [here](https://github.com/hashbangCoder/Text-Summarization)
+
 
 ## Dependencies
 You require :

@@ -30,9 +30,9 @@ class Encoder(Module):
 
 		self.word_embed = wordEmbed
 		self.fwd_rnn = LSTM(self.input_size, self.hidden_size, batch_first=True)
-		self.fwd_rnn = DataParallel(self.fwd_rnn)
+		# self.fwd_rnn = DataParallel(self.fwd_rnn)
 		self.bkwd_rnn = LSTM(self.input_size, self.hidden_size, batch_first=True)
-		self.bkwd_rnn = DataParallel(self.bkwd_rnn)
+		# self.bkwd_rnn = DataParallel(self.bkwd_rnn)
 		self.output_cproj = Linear(self.hidden_size * 2, self.hidden_size)
 		self.output_cproj = DataParallel(self.output_cproj)
 		self.output_hproj = Linear(self.hidden_size * 2, self.hidden_size)
@@ -71,7 +71,7 @@ class PointerAttentionDecoder(Module):
 
 		#self.decoderRNN = LSTMCell(self.input_size, self.hidden_size)
 		self.decoderRNN = LSTM(self.input_size, self.hidden_size, batch_first=True)
-		self.decoderRNN = DataParallel(self.decoderRNN)
+		# self.decoderRNN = DataParallel(self.decoderRNN)
 		#params for attention
 		self.Wh = Linear(2 * self.hidden_size, 2*self. hidden_size)
 		self.Wh = DataParallel(self.Wh)
