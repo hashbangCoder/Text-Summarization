@@ -4,8 +4,8 @@ import hashlib
 import struct
 import subprocess
 import collections
-import tensorflow as tf
-from tensorflow.core.example import example_pb2
+#import tensorflow as tf
+#from tensorflow.core.example import example_pb2
 import cPickle as pickle
 import pdb
 dm_single_close_quote = u'\u2019' # unicode
@@ -178,8 +178,8 @@ def write_to_bin(url_file, out_file, makevocab=False):
 
     # Get the strings to write to .bin file
     article, abstract = get_art_abs(story_file)
-    
-    # Write to dict    
+
+    # Write to dict
     data_file[idx] = {'article':article, 'abstract':abstract}
 
     # Write to tf.Example
@@ -200,8 +200,8 @@ def write_to_bin(url_file, out_file, makevocab=False):
       tokens = [t.strip() for t in tokens] # strip
       tokens = [t for t in tokens if t!=""] # remove empty
       vocab_counter.update(tokens)
-    
-  with open(out_file, 'wb') as writer:  
+
+  with open(out_file, 'wb') as writer:
     pickle.dump(data_file, writer)
   print "Finished writing file : %s\n" % out_file
 

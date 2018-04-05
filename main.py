@@ -47,24 +47,29 @@ def evalModel(model):
     print '\n\n'
     print '*'*30, ' MODEL EVALUATION ', '*'*30
 
-    _article, _revArticle,  _extArticle, max_article_oov, article_oov, article_string, abs_string = dl.getEvalBatch()        
+    _article, _revArticle,  _extArticle, max_article_oov, article_oov, article_string, abs_string = dl.getEvalBatch()
     _article = Variable(_article.cuda(), volatile=True)
     _extArticle = Variable(_extArticle.cuda(), volatile=True)
-    _revArticle = Variable(_revArticle.cuda(), volatile=True)    
+    _revArticle = Variable(_revArticle.cuda(), volatile=True)
     all_summaries = model((_article, _revArticle, _extArticle), max_article_oov, decode_flag=True)
     model.train()
     return all_summaries, article_string, abs_string, article_oov
 
 ### utility code for displaying generated abstract
-def displayOutput(all_summaries, article, abstract, article_oov, show_ground_truth=False):    
+def displayOutput(all_summaries, article, abstract, article_oov, show_ground_truth=False):
     print '*' * 80
     print '\n'
     if show_ground_truth:
         print 'ARTICLE TEXT : \n', article
         print 'ACTUAL ABSTRACT : \n', abstract
-    for i, summary in enumerate(all_summaries):    
-        generated_summary = ' '.join([dl.id2word[ind] if ind<=dl.vocabSize else article_oov[ind % dl.vocabSize] for ind in summary])
-        print 'GENERATED ABSTRACT #%d : \n' %(i+1), generated_summary    
+    for i, summary in enumerate(all_summaries):
+        # generated_summary = ' '.join([dl.id2word[ind] if ind<=dl.vocabSize else article_oov[ind % dl.vocabSize] for ind in summary])
+        try:
+            generated_summary = ' '.join([dl.id2word[ind] if ind<dl.vocabSize else article_oov[ind % dl.vocabSize] for ind in summary])      
+        except: 
+            print 'error in index'
+            pass
+        print 'GENERATED ABSTRACT #%d : \n' %(i+1), generated_summary
     print '*' * 80
     return
 
@@ -75,7 +80,7 @@ def save_model(net, optimizer,all_summaries, article_string, abs_string):
     print 'Saving Model to : ', opt.save_dir
     save_name = opt.save_dir + 'savedModel_E%d_%d.pth' % (dl.epoch, dl.iterInd)
     torch.save(save_dict, save_name)
-    print '-' * 60  
+    print '-' * 60
     return
 
 
@@ -87,12 +92,12 @@ with open(opt.vocab_file) as f:
     vocab = [item[0] for item in vocab[:-(5+ 50000 - opt.trunc_vocab)]]             # Truncate vocabulary to conserve memory
 vocab += ['<unk>', '<go>', '<end>', '<s>', '</s>']                                  # add special token to vocab to bring total count to 50k
 
-dl = dataloader.dataloader(opt.batchSize, opt.epochs, vocab, opt.train_file, opt.test_file, 
+dl = dataloader.dataloader(opt.batchSize, opt.epochs, vocab, opt.train_file, opt.test_file,
                           opt.max_article_size, opt.max_abstract_size)
 
 
 if opt.bootstrap:
-    # bootstrap with pretrained embeddings    
+    # bootstrap with pretrained embeddings
     wordEmbed = torch.nn.Embedding(len(vocab) + 1, 300, 0)
     print 'Bootstrapping with pretrained GloVe word vectors...'
     assert os.path.isfile('embeds.pkl'), 'Cannot find pretrained Word embeddings to bootstrap'
@@ -117,14 +122,14 @@ if opt.load_model is not None and os.path.isfile(opt.load_model):
     optimizer.load_state_dict(saved_file['optim'])
     dl.epoch = saved_file['epoch']
     dl.iterInd = saved_file['iter']
-    dl.pbar.update(dl.iterInd)        
+    dl.pbar.update(dl.iterInd)
     print '\n','*'*30, 'RESUME FROM CHECKPOINT : %s' %opt.load_model,'*'*30
-    
+
 else:
     print '\n','*'*30, 'START TRAINING','*'*30
 
 #dl.iterInd = 287226
-#dl.pbar.update(dl.iterInd)        
+#dl.pbar.update(dl.iterInd)
 all_loss = []
 win = None
 ### Training loop'
@@ -134,44 +139,44 @@ while dl.epoch <= opt.epochs:
     # end of training/max epoch reached
     if data_batch is None:
         print '-'*50, 'END OF TRAINING', '-'*50
-        break    
-    
+        break
+
     batchArticles = Variable(batchArticles.cuda())
     batchExtArticles = Variable(batchExtArticles.cuda())
     batchRevArticles = Variable(batchRevArticles.cuda())
     batchTargets = Variable(batchTargets.cuda())
-    batchAbstracts = Variable(batchAbstracts.cuda())        
+    batchAbstracts = Variable(batchAbstracts.cuda())
 
     losses = net((batchArticles, batchExtArticles, batchRevArticles, batchAbstracts, batchTargets), max_article_oov)
     batch_loss = losses.mean()
-    
+
     batch_loss.backward()
     # gradient clipping by norm
     clip_grad_norm(net.parameters(), opt.grad_clip)
     optimizer.step()
     optimizer.zero_grad()
-    
-    # update loss ticker    
+
+    # update loss ticker
     dl.pbar.set_postfix(loss=batch_loss.cpu().data[0])
-    dl.pbar.update(opt.batchSize)        
-    
+    dl.pbar.update(opt.batchSize)
+
     # save losses periodically
     if dl.iterInd % 50:
         all_loss.append(batch_loss.cpu().data.tolist()[0])
-        title = 'Pointer Model with Coverage'        
+        title = 'Pointer Model with Coverage'
         if win is None:
             win = vis.line(Y=np.array(all_loss), X=np.arange(1, len(all_loss)+1), opts=dict(title=title, xlabel='#Mini-Batches (x%d)' %(opt.batchSize),
                            ylabel='Train-Loss'))
         vis.line(Y=np.array(all_loss), X=np.arange(1, len(all_loss)+1), win=win, update='replace', opts=dict(title=title, xlabel='#Mini-Batches (x%d)' %(opt.batchSize),
                            ylabel='Train-Loss'))
-    
+
     # evaluate model periodically
-    if dl.iterInd % opt.eval_freq < opt.batchSize and dl.iterInd > opt.batchSize:       
+    if dl.iterInd % opt.eval_freq < opt.batchSize and dl.iterInd > opt.batchSize:
         all_summaries, article_string, abs_string, article_oov = evalModel(net)
         displayOutput(all_summaries, article_string, abs_string, article_oov, show_ground_truth=opt.print_ground_truth)
-    
-    #if dl.epoch > 1 and dl.iterInd == 0:       
-        if dl.iterInd % (6*opt.eval_freq) < opt.batchSize and dl.iterInd > opt.batchSize:       
+
+    #if dl.epoch > 1 and dl.iterInd == 0:
+        if dl.iterInd % (6*opt.eval_freq) < opt.batchSize and dl.iterInd > opt.batchSize:
             save_model(net, optimizer, all_summaries, article_string, abs_string)
 
     del batch_loss, batchArticles, batchExtArticles, batchRevArticles, batchAbstracts, batchTargets
