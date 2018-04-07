@@ -5,58 +5,103 @@ import torch.nn.functional as F
 import pdb
 from numpy import inf
 
+use_gpu = True
+
 
 # idea similar to https://github.com/abisee/pointer-generator/blob/master/beam_search.py
 class Hypothesis(object):
-	def __init__(self, token_id, hidden_state, cell_state, log_prob):
-		self._h = hidden_state
-		self._c = cell_state
-		self.log_prob = log_prob
-		self.full_prediction = token_id # list
-		self.survivability = self.log_prob/ float(len(self.full_prediction))
+    def __init__(self, token_id, hidden_state, cell_state, log_prob):
+        self._h = hidden_state
+        self._c = cell_state
+        self.log_prob = log_prob
+        self.full_prediction = token_id # list
+        self.survivability = self.log_prob/ float(len(self.full_prediction))
 
-	def extend(self, token_id, hidden_state, cell_state, log_prob):
-		return Hypothesis(token_id= self.full_prediction + [token_id],
-						  hidden_state=hidden_state,
-						  cell_state=cell_state,
-						  log_prob= self.log_prob + log_prob)
+    def extend(self, token_id, hidden_state, cell_state, log_prob):
+        return Hypothesis(token_id= self.full_prediction + [token_id],
+                          hidden_state=hidden_state,
+                          cell_state=cell_state,
+                          log_prob= self.log_prob + log_prob)
 
 # encoder net for the article
 class Encoder(Module):
-	def __init__(self, input_size, hidden_size, wordEmbed):
-		super(Encoder,self).__init__()
-		self.input_size = input_size
-		self.hidden_size = hidden_size
+    def __init__(self, input_size, hidden_size, wordEmbed):
+        super(Encoder,self).__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.num_layers = 1
+        self.word_embed = wordEmbed
+        self.fwd_rnn = LSTM(self.input_sizeopt, self.hidden_size, batch_first=True)
+        # self.fwd_rnn = DataParallel(self.fwd_rnn)
+        self.bkwd_rnn = LSTM(self.input_size, self.hidden_size, batch_first=True)
+        # self.bkwd_rnn = DataParallel(self.bkwd_rnn)
+        self.output_cproj = Linear(self.hidden_size * 2, self.hidden_size)
+        self.output_cproj = DataParallel(self.output_cproj)
+        self.output_hproj = Linear(self.hidden_size * 2, self.hidden_size)
+        self.output_hproj = DataParallel(self.output_hproj)
+    
+    def init_hidden(self, batch_size):
+        # Before we've done anything, we dont have any hidden state.
+        # Refer to the Pytorch documentation to see exactly
+        # why they have this dimensionality.
+        # The axes semantics are (num_layers, minibatch_size, hidden_size)
+        if use_gpu:
+            var = (Variable(torch.zeros(self.num_layers, batch_size, self.hidden_size).cuda()),
+                Variable(torch.zeros(self.num_layers, batch_size, self.hidden_size).cuda()))
+        else:
+            var = (Variable(torch.zeros(self.num_layers, batch_size, self.hidden_size)),
+                Variable(torch.zeros(self.num_layers, batch_size, self.hidden_size)))
+        return var
 
-		self.word_embed = wordEmbed
-		self.fwd_rnn = LSTM(self.input_size, self.hidden_size, batch_first=True)
-		# self.fwd_rnn = DataParallel(self.fwd_rnn)
-		self.bkwd_rnn = LSTM(self.input_size, self.hidden_size, batch_first=True)
-		# self.bkwd_rnn = DataParallel(self.bkwd_rnn)
-		self.output_cproj = Linear(self.hidden_size * 2, self.hidden_size)
-		self.output_cproj = DataParallel(self.output_cproj)
-		self.output_hproj = Linear(self.hidden_size * 2, self.hidden_size)
-		self.output_hproj = DataParallel(self.output_hproj)
 
-	def forward(self, _input, rev_input):
-		batch_size, max_len = _input.size(0), _input.size(1)
-		embed_fwd = self.word_embed(_input)
-		embed_rev = self.word_embed(rev_input)
+    def forward(self, _input, rev_input):
+        batch_size, max_len = _input.size(0), _input.size(1)
+        embed_fwd = self.word_embed(_input)
+        embed_rev = self.word_embed(rev_input)
+        self.hidden = self.init_hidden(batch_size)
+        # get mask for location of PAD
+        mask = _input.eq(0).detach()
 
-		# get mask for location of PAD
-		mask = _input.eq(0).detach()
+        lstm_hidden = [self.init_hidden(batch_size) for i in range(len(max_len)) ]  
+        context, _ =  self.init_hidden(batch_size)
 
-		fwd_out, fwd_state = self.fwd_rnn(embed_fwd)
-		bkwd_out, bkwd_state = self.bkwd_rnn(embed_rev)
-		hidden_cat = torch.cat((fwd_out, bkwd_out), 2)
+        if use_gpu:
+            lstm_out = Variable(torch.zeros(len(sentence), batch_size, self.hidden_size).cuda())
+            input_embeds = input_embeds.cuda()
+            decoder_out = Variable(torch.zeros(len_summary, batch_size, self.hidden_size).cuda())
+        else:
+            lstm_out = Variable(torch.zeros(len(sentence), batch_size, self.hidden_size))
+            decoder_out = Variable(torch.zeros(len_summary, batch_size, self.hidden_size))
 
-		# inverse of mask
-		inv_mask = mask.eq(0).unsqueeze(2).expand(batch_size, max_len, self.hidden_size * 2).float().detach()
-		hidden_out = hidden_cat * inv_mask
-		final_hidd_proj = self.output_hproj(torch.cat((fwd_state[0].squeeze(0), bkwd_state[0].squeeze(0)), 1))
-		final_cell_proj = self.output_cproj(torch.cat((fwd_state[1].squeeze(0), bkwd_state[1].squeeze(0)), 1))
+        for j in range(len(max_len)):
+            #calculate the context
+            context = context*0
+            if j>0:
+                for k in range(int(np.log2(j)) + 1):
+                    context = context + lstm_hidden[j-2**k][0]
+            #forward pass into the encoder
+#             print("input dim: {}, hidden_length: {}, context_len: {}".format(input_embeds[j].dim(), self.hidden[0].dim(), context.dim()))
+            out, self.hidden = self.fwd_rnn(embed_fwd[j].view(1, batch_size, -1), (context, self.hidden[1]) )
+            lstm_out[j] = out
+            lstm_hidden[j] = self.hidden
+                
+        # encoder_hidden = self.hidden
+        # decoder_hidden = self.init_hidden()
+        # decoder_hidden = decoder_hidden + encoder_hidden
 
-		return hidden_out, final_hidd_proj, final_cell_proj, mask
+        fwd_out = lstm_out
+        fwd_state = self.hidden
+        # fwd_out, fwd_state = self.fwd_rnn(embed_fwd)
+        bkwd_out, bkwd_state = self.bkwd_rnn(embed_rev)
+        hidden_cat = torch.cat((fwd_out, bkwd_out), 2)
+
+        # inverse of mask
+        inv_mask = mask.eq(0).unsqueeze(2).expand(batch_size, max_len, self.hidden_size * 2).float().detach()
+        hidden_out = hidden_cat * inv_mask
+        final_hidd_proj = self.output_hproj(torch.cat((fwd_state[0].squeeze(0), bkwd_state[0].squeeze(0)), 1))
+        final_cell_proj = self.output_cproj(torch.cat((fwd_state[1].squeeze(0), bkwd_state[1].squeeze(0)), 1))
+
+        return hidden_out, final_hidd_proj, final_cell_proj, mask
 
 # TODO Enhancement: Project input embedding with previous context vector for current input
 class PointerAttentionDecoder(Module):
@@ -144,70 +189,70 @@ class PointerAttentionDecoder(Module):
 			attn_scores = e_t.view(batch_size, max_enc_len)
 			del e_t
                         #print(attn_scores,enc_mask.data)
-			#attn_scores.masked_fill_(enc_mask, float('-inf'))
-			attn_scores.masked_fill_(enc_mask, -1e30)
-			attn_scores = F.softmax(attn_scores)
+            #attn_scores.masked_fill_(enc_mask, float('-inf'))
+            attn_scores.masked_fill_(enc_mask, -1e30)
+            attn_scores = F.softmax(attn_scores)
 
-			context = attn_scores.unsqueeze(1).bmm(enc_states).squeeze(1)
-			p_vocab = 	F.softmax(self.V(torch.cat((_h, context), 1)))									#output proj calculation
-			p_gen = F.sigmoid(self.w_h(context) + self.w_s(_h) + self.w_x(embed_input[:, _step, :]))	# p_gen calculation
-			p_gen = p_gen.view(-1, 1)
-			weighted_Pvocab = p_gen * p_vocab
-			weighted_attn = (1-p_gen)* attn_scores
+            context = attn_scores.unsqueeze(1).bmm(enc_states).squeeze(1)
+            p_vocab =     F.softmax(self.V(torch.cat((_h, context), 1)))                                    #output proj calculation
+            p_gen = F.sigmoid(self.w_h(context) + self.w_s(_h) + self.w_x(embed_input[:, _step, :]))    # p_gen calculation
+            p_gen = p_gen.view(-1, 1)
+            weighted_Pvocab = p_gen * p_vocab
+            weighted_attn = (1-p_gen)* attn_scores
 
-			if self.max_article_oov > 0:
-				ext_vocab = Variable(torch.zeros(batch_size, self.max_article_oov).cuda())				#create OOV (but in-article) zero vectors
-				combined_vocab = torch.cat((weighted_Pvocab, ext_vocab), 1)
-				del ext_vocab
-			else:
-				combined_vocab = weighted_Pvocab
+            if self.max_article_oov > 0:
+                ext_vocab = Variable(torch.zeros(batch_size, self.max_article_oov).cuda())                #create OOV (but in-article) zero vectors
+                combined_vocab = torch.cat((weighted_Pvocab, ext_vocab), 1)
+                del ext_vocab
+            else:
+                combined_vocab = weighted_Pvocab
 
-			del weighted_Pvocab
-			assert article_inds.data.min() >=0 and article_inds.data.max() <= (self.vocab_size+ self.max_article_oov), 'Recheck OOV indexes!'
+            del weighted_Pvocab
+            assert article_inds.data.min() >=0 and article_inds.data.max() <= (self.vocab_size+ self.max_article_oov), 'Recheck OOV indexes!'
 
-			# scatter article word probs to combined vocab prob.
-			# subtract one to account for 0-index
-			article_inds_masked = article_inds.add(-1).masked_fill_(enc_mask, 0)
-			combined_vocab = combined_vocab.scatter_add(1, article_inds_masked, weighted_attn)
+            # scatter article word probs to combined vocab prob.
+            # subtract one to account for 0-index
+            article_inds_masked = article_inds.add(-1).masked_fill_(enc_mask, 0)
+            combined_vocab = combined_vocab.scatter_add(1, article_inds_masked, weighted_attn)
 
-			# mask the output to account for PAD
-			# subtract one from target for 0-index
-			target_mask_0 = target.ne(0).detach()
-			target_mask_p = target.eq(0).detach()
-			target = target - 1
-			output = combined_vocab.gather(1, target.masked_fill_(target_mask_p, 0))
-			lm_loss.append(output.log().mul(-1) * target_mask_0.float())
+            # mask the output to account for PAD
+            # subtract one from target for 0-index
+            target_mask_0 = target.ne(0).detach()
+            target_mask_p = target.eq(0).detach()
+            target = target - 1
+            output = combined_vocab.gather(1, target.masked_fill_(target_mask_p, 0))
+            lm_loss.append(output.log().mul(-1) * target_mask_0.float())
 
-			coverage = coverage + attn_scores
+            coverage = coverage + attn_scores
 
-			# Coverage Loss
-			# take minimum across both attn_scores and coverage
-			_cov_loss, _ = torch.stack((coverage, attn_scores), 2).min(2)
-			cov_loss.append(_cov_loss.sum(1))
+            # Coverage Loss
+            # take minimum across both attn_scores and coverage
+            _cov_loss, _ = torch.stack((coverage, attn_scores), 2).min(2)
+            cov_loss.append(_cov_loss.sum(1))
 
-		# add individual losses
-		total_masked_loss = torch.cat(lm_loss, 1).sum(1).div(dec_lens) + self.lmbda*torch.stack(cov_loss, 1).sum(1).div(dec_lens)
-		return total_masked_loss
+        # add individual losses
+        total_masked_loss = torch.cat(lm_loss, 1).sum(1).div(dec_lens) + self.lmbda*torch.stack(cov_loss, 1).sum(1).div(dec_lens)
+        return total_masked_loss
 
-	def decode_step(self, enc_states, state, _input, enc_mask, article_inds):
-		# decode for one step with beam search
-		# for first step, batch_size =1
-		# successive steps batch_size = beam_size
-		batch_size, max_enc_len, enc_size = enc_states.size()
+    def decode_step(self, enc_states, state, _input, enc_mask, article_inds):
+        # decode for one step with beam search
+        # for first step, batch_size =1
+        # successive steps batch_size = beam_size
+        batch_size, max_enc_len, enc_size = enc_states.size()
 
-		# coverage initially zero
-		coverage =  Variable(torch.zeros(batch_size, max_enc_len).cuda())
+        # coverage initially zero
+        coverage =  Variable(torch.zeros(batch_size, max_enc_len).cuda())
 
-		enc_proj = self.Wh(enc_states.view(batch_size*max_enc_len, enc_size)).view(batch_size, max_enc_len, -1)
-		embed_input = self.word_embed(_input)
+        enc_proj = self.Wh(enc_states.view(batch_size*max_enc_len, enc_size)).view(batch_size, max_enc_len, -1)
+        embed_input = self.word_embed(_input)
 
-		_h, _c = self.decoderRNN(embed_input, state)[1]
-		_h = _h.squeeze(0)
-		dec_proj = self.Ws(_h).unsqueeze(1).expand_as(enc_proj)
-		cov_proj = self.w_c(coverage.view(-1, 1)).view(batch_size, max_enc_len, -1)
-		e_t = self.v(F.tanh(enc_proj + dec_proj + cov_proj).view(batch_size*max_enc_len, -1))
-		attn_scores = e_t.view(batch_size, max_enc_len)
-		del e_t
+        _h, _c = self.decoderRNN(embed_input, state)[1]
+        _h = _h.squeeze(0)
+        dec_proj = self.Ws(_h).unsqueeze(1).expand_as(enc_proj)
+        cov_proj = self.w_c(coverage.view(-1, 1)).view(batch_size, max_enc_len, -1)
+        e_t = self.v(F.tanh(enc_proj + dec_proj + cov_proj).view(batch_size*max_enc_len, -1))
+        attn_scores = e_t.view(batch_size, max_enc_len)
+        del e_t
                 #attn_scores.masked_fill_(enc_mask, -float('Inf'))
 		attn_scores.masked_fill_(enc_mask, -1e30)
 		attn_scores = F.softmax(attn_scores)
