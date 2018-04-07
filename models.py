@@ -62,7 +62,7 @@ class Encoder(Module):
         # get mask for location of PAD
         mask = _input.eq(0).detach()
 
-        lstm_hidden = [self.init_hidden(batch_size) for i in range(len(max_len)) ]  
+        lstm_hidden = [self.init_hidden(batch_size) for i in range(max_len) ]  
         context, _ =  self.init_hidden(batch_size)
 
         if use_gpu:
@@ -73,7 +73,7 @@ class Encoder(Module):
             lstm_out = Variable(torch.zeros(len(sentence), batch_size, self.hidden_size))
             decoder_out = Variable(torch.zeros(len_summary, batch_size, self.hidden_size))
 
-        for j in range(len(max_len)):
+        for j in range(max_len):
             #calculate the context
             context = context*0
             if j>0:
