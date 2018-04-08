@@ -100,7 +100,6 @@ vocab += ['<unk>', '<go>', '<end>', '<s>', '</s>']                              
 dl = dataloader.dataloader(opt.batchSize, opt.epochs, vocab, opt.train_file, opt.test_file,
                           opt.max_article_size, opt.max_abstract_size)
 
-
 if opt.bootstrap:
     # bootstrap with pretrained embeddings
     wordEmbed = torch.nn.Embedding(len(vocab) + 1, 300, 0)
