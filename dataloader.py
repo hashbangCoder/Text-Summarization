@@ -39,12 +39,16 @@ class dataloader():
 		self.testSamples = len(self.test_data)
 
 		# self.loadEvalBatch()
+
+		# Set up tqdm BAR if in train_mode
 		if not self.test_mode:
 			self.stopFlag = False
 			self.pbar = tqdm(total=self.trainSamples * self.maxEpochs)
 			self.pbar.set_description('Epoch : %d/%d' % (self.epoch, self.maxEpochs))
 
 	def getVocabMap(self, vocab):
+		""" Function to build the word2id and id2word dicts from vocab dict.
+		"""
 		word2id, id2word = {}, {}
 		for i, word in enumerate(vocab):
 			word2id[word] = i+1 # reserve 0 for pad
@@ -57,6 +61,12 @@ class dataloader():
 		return word2id, id2word
 
 	def makeEncoderInput(self, article):
+		"""
+		Given a single article(word tokenized)it and makes 
+		1) _intArticle : list of word ids and unk id if it occurs
+		2) extIntArticle : list of word ids and temp unk token id
+		3) article_oovs : list of oovs in the articel
+		"""
 		# tokenize article
 		# list of OOV words in article
 		self.encUnkCount = 1
@@ -97,12 +107,14 @@ class dataloader():
 
 	def preproc(self, samples):
 		# batchArticles --> tensor batch of articles with ids
-		# batchRevArticles --> tensor batch of reversed articles with ids
 		# batchExtArticles --> tensor batch of articles with ids and <unk> replaced by temp OOV ids
+		# batchRevArticles --> tensor batch of reversed articles with ids
 		# batchAbstracts --> tensor batch of abstract (input for decoder) with ids
 		# batchTargets --> tensor batch of target abstracts
+		# art_lens --> list of article lens
+		# abs_lens --> list of abstract lens
 		# max_article_oov --> max number of OOV tokens in article batch
-
+		# article_oovs = --> list of article oovs
 
 		# limit max article size to 400 tokens
 		extIntArticles, intRevArticles, intAbstract, intTargets, extIntAbstracts = [], [], [], [], []
@@ -120,6 +132,7 @@ class dataloader():
 			_intAbstract, _extIntAbstract, abs_len = self.makeDecoderInput(abstract, article_oov)
 
 			# append stopping/start tokens and increment length by 1
+			# Need <go> in the inputs to decoder and <end> in targets
 			intAbstract.append([self.word2id['<go>']] + _intAbstract)
 			# append end token
 			intTargets.append(_extIntAbstract + [self.word2id['<end>']])
@@ -135,6 +148,7 @@ class dataloader():
 		padTargets = [torch.LongTensor(item + [0] * (max(abs_lens) - len(item))) for item in intTargets]
 
 		batchExtArticles = torch.stack(padExtArticles, 0)
+		#Now this batchExtArticle is of size #Article x max(art_len)
 		# replace temp ids with unk token id for enc input
 		batchArticles = batchExtArticles.clone().masked_fill_((batchExtArticles > self.vocabSize), self.word2id['<unk>'])
 		batchRevArticles = torch.stack(padRevArticles, 0)
@@ -213,6 +227,9 @@ class dataloader():
 			return self.evalPreproc(data)
 
 	def getInputTextSample(self, tokenized_text):
+		"""
+		Used in Evaluating phase
+		"""
 		extIntArticles, intRevArticles = [], []
 		max_article_oov = 0
 		# get article  int-tokenized
@@ -233,7 +250,3 @@ class dataloader():
 		batchRevArticles = torch.stack(padRevArticles, 0)
 
 		return batchArticles, batchRevArticles, batchExtArticles, max_article_oov, article_oov
-
-
-
-

@@ -39,10 +39,11 @@ parser.add_argument("--load-model", dest="load_model", help="Directory from whic
 opt = parser.parse_args()
 vis = Visdom()
 
-
-### evaluation code
 def evalModel(model):
-    # set model to eval mode
+    """
+    ### evaluation code  # set model to eval mode
+    """
+    # TODO : where is eval() defined
     model.eval()
     print '\n\n'
     print '*'*30, ' MODEL EVALUATION ', '*'*30
@@ -52,11 +53,14 @@ def evalModel(model):
     _extArticle = Variable(_extArticle.cuda(), volatile=True)
     _revArticle = Variable(_revArticle.cuda(), volatile=True)
     all_summaries = model((_article, _revArticle, _extArticle), max_article_oov, decode_flag=True)
+    # TODO : Why do we need to train now
     model.train()
     return all_summaries, article_string, abs_string, article_oov
 
-### utility code for displaying generated abstract
 def displayOutput(all_summaries, article, abstract, article_oov, show_ground_truth=False):
+    """
+    Utility code for displaying generated abstract/multiple abstracts from beam search
+    """
     print '*' * 80
     print '\n'
     if show_ground_truth:
@@ -73,8 +77,10 @@ def displayOutput(all_summaries, article, abstract, article_oov, show_ground_tru
     print '*' * 80
     return
 
-# Utility code to save model to disk
 def save_model(net, optimizer,all_summaries, article_string, abs_string):
+    """
+    Utility code to save model to disk
+    """
     save_dict = dict({'model': net.state_dict(), 'optim': optimizer.state_dict(), 'epoch': dl.epoch, 'iter':dl.iterInd, 'summaries':all_summaries, 'article':article_string, 'abstract_gold':abs_string})
     print '\n','-' * 60
     print 'Saving Model to : ', opt.save_dir
@@ -83,8 +89,6 @@ def save_model(net, optimizer,all_summaries, article_string, abs_string):
     print '-' * 60
     return
 
-
-
 assert opt.trunc_vocab <= 50000, 'Invalid value for --truncate-vocab'
 assert os.path.isfile(opt.vocab_file), 'Invalid Path to vocabulary file'
 with open(opt.vocab_file) as f:
@@ -92,6 +96,7 @@ with open(opt.vocab_file) as f:
     vocab = [item[0] for item in vocab[:-(5+ 50000 - opt.trunc_vocab)]]             # Truncate vocabulary to conserve memory
 vocab += ['<unk>', '<go>', '<end>', '<s>', '</s>']                                  # add special token to vocab to bring total count to 50k
 
+#Create an object of the Dataloader class.
 dl = dataloader.dataloader(opt.batchSize, opt.epochs, vocab, opt.train_file, opt.test_file,
                           opt.max_article_size, opt.max_abstract_size)
 
