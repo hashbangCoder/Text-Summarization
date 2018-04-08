@@ -106,15 +106,17 @@ class dataloader():
 		return _intAbstract, extIntAbstract, abs_len
 
 	def preproc(self, samples):
-		# batchArticles --> tensor batch of articles with ids
-		# batchExtArticles --> tensor batch of articles with ids and <unk> replaced by temp OOV ids
-		# batchRevArticles --> tensor batch of reversed articles with ids
-		# batchAbstracts --> tensor batch of abstract (input for decoder) with ids
-		# batchTargets --> tensor batch of target abstracts
-		# art_lens --> list of article lens
-		# abs_lens --> list of abstract lens
-		# max_article_oov --> max number of OOV tokens in article batch
-		# article_oovs = --> list of article oovs
+		"""
+		batchArticles --> tensor batch of articles with ids
+		batchExtArticles --> tensor batch of articles with ids and <unk> replaced by temp OOV ids
+		batchRevArticles --> tensor batch of reversed articles with ids
+		batchAbstracts --> tensor batch of abstract (input for decoder) with ids
+		batchTargets --> tensor batch of target abstracts
+		art_lens --> list of article lens
+		abs_lens --> list of abstract lens
+		max_article_oov --> max number of OOV tokens in article batch
+		article_oovs = --> list of article oovs
+		"""
 
 		# limit max article size to 400 tokens
 		extIntArticles, intRevArticles, intAbstract, intTargets, extIntAbstracts = [], [], [], [], []

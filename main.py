@@ -100,6 +100,7 @@ vocab += ['<unk>', '<go>', '<end>', '<s>', '</s>']                              
 dl = dataloader.dataloader(opt.batchSize, opt.epochs, vocab, opt.train_file, opt.test_file,
                           opt.max_article_size, opt.max_abstract_size)
 
+# TODO: See how nn.Embeddings work and try to use Glove Vectors instead of learning new. Trainable?
 if opt.bootstrap:
     # bootstrap with pretrained embeddings
     wordEmbed = torch.nn.Embedding(len(vocab) + 1, 300, 0)
@@ -151,13 +152,16 @@ while dl.epoch <= opt.epochs:
     batchTargets = Variable(batchTargets.cuda())
     batchAbstracts = Variable(batchAbstracts.cuda())
 
+    # Losses for the whole batch. Then do SGD.
     losses = net((batchArticles, batchExtArticles, batchRevArticles, batchAbstracts, batchTargets), max_article_oov)
     batch_loss = losses.mean()
 
+    # Backpropagation Step
     batch_loss.backward()
     # gradient clipping by norm
     clip_grad_norm(net.parameters(), opt.grad_clip)
     optimizer.step()
+    # Flush the gradients.
     optimizer.zero_grad()
 
     # update loss ticker
