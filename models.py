@@ -58,8 +58,6 @@ class Encoder(Module):
 
 		return hidden_out, final_hidd_proj, final_cell_proj, mask
 
-
-
 # TODO Enhancement: Project input embedding with previous context vector for current input
 class PointerAttentionDecoder(Module):
 	def __init__(self, input_size, hidden_size, vocab_size, wordEmbed):
@@ -91,7 +89,6 @@ class PointerAttentionDecoder(Module):
 		self.w_x = DataParallel(self.w_x)
 
 		#params for output proj
-
 		self.V = Linear(self.hidden_size * 3, self.vocab_size)
 		self.V = DataParallel(self.V)
 		self.min_length = 40
@@ -107,19 +104,19 @@ class PointerAttentionDecoder(Module):
 		self.beam_size = beam_size
 		self.lmbda = lmbda
 
-
 	def forward(self, enc_states, enc_final_state, enc_mask, _input, article_inds, targets, decode=False):
-		# enc_states -> output states of encoder
-		# enc_final_state -> final output of encoder
-		# enc_mask -> mask indicating location of PAD in encoder input
-		# _input -> decoder inputs
-		# article_inds -> modified encoder input with temporary OOV ids for each OOV token
-		# targets -> decoder targets
-		# decode -> Boolean flag for train/eval mode
+		"""
+		enc_states -> output states of encoder
+		enc_final_state -> final output of encoder
+		enc_mask -> mask indicating location of PAD in encoder input
+		_input -> decoder inputs
+		article_inds -> modified encoder input with temporary OOV ids for each OOV token
+		targets -> decoder targets
+		decode -> Boolean flag for train/eval mode
+		"""	
 
 		if decode is True:
 			return self.decode(enc_states, enc_final_state, enc_mask, article_inds)
-
 
 		batch_size, max_enc_len, enc_size = enc_states.size()
 		max_dec_len = _input.size(1)
@@ -233,9 +230,7 @@ class PointerAttentionDecoder(Module):
 		# scatter article word probs to combined vocab prob.
 		# subtract one to account for 0-index
 		combined_vocab = combined_vocab.scatter_add(1, article_inds.add(-1), weighted_attn)
-
 		return combined_vocab, _h, _c.squeeze(0)
-
 
 	def getOverallTopk(self, vocab_probs, _h, _c, all_hyps, results):
 		# return top-k values i.e. top-k over all beams i.e. next step input ids
@@ -302,12 +297,9 @@ class PointerAttentionDecoder(Module):
 			_input = Variable(decode_inds.cuda(), volatile=True)
 			init_state = (Variable(init_h.unsqueeze(0), volatile=True), Variable(init_c.unsqueeze(0), volatile=True))
 
-
-
 		non_terminal_output = [item.full_prediction for item in all_hyps]
 		all_outputs = decoded_outputs + non_terminal_output
 		return all_outputs
-
 
 class SummaryNet(Module):
 	def __init__(self, input_size, hidden_size, vocab_size, wordEmbed, start_id, stop_id, unk_id, beam_size=4, max_decode=40, lmbda=1):
@@ -328,18 +320,9 @@ class SummaryNet(Module):
 			enc_states, enc_hn, enc_cn, enc_mask = self.encoder(enc_input, rev_enc_input)
 			model_summary = self.pointerDecoder(enc_states, (enc_hn, enc_cn), enc_mask, None, article_inds, targets=None, decode=True)
 			return model_summary
-
 		else:
 		# train code
 			enc_input, article_inds, rev_enc_input, dec_input, dec_target = _input
 			enc_states, enc_hn, enc_cn, enc_mask = self.encoder(enc_input, rev_enc_input)
-
 			total_loss = self.pointerDecoder(enc_states, (enc_hn, enc_cn), enc_mask, dec_input, article_inds, targets=dec_target)
 			return total_loss
-
-
-
-
-
-
-

@@ -41,19 +41,19 @@ vis = Visdom()
 
 def evalModel(model):
     """
-    ### evaluation code  # set model to eval mode
+    Code for running model in eval mode
     """
-    # TODO : where is eval() defined
+    # Set the model to Evaluation mode as needed by Pytorch (Helpful in Batchnorm and Dropout etc)
     model.eval()
     print '\n\n'
     print '*'*30, ' MODEL EVALUATION ', '*'*30
-
+    # Get one eval sample for testing
     _article, _revArticle,  _extArticle, max_article_oov, article_oov, article_string, abs_string = dl.getEvalBatch()
     _article = Variable(_article.cuda(), volatile=True)
     _extArticle = Variable(_extArticle.cuda(), volatile=True)
     _revArticle = Variable(_revArticle.cuda(), volatile=True)
     all_summaries = model((_article, _revArticle, _extArticle), max_article_oov, decode_flag=True)
-    # TODO : Why do we need to train now
+    # Set the model back to training mode.
     model.train()
     return all_summaries, article_string, abs_string, article_oov
 
@@ -79,7 +79,7 @@ def displayOutput(all_summaries, article, abstract, article_oov, show_ground_tru
 
 def save_model(net, optimizer,all_summaries, article_string, abs_string):
     """
-    Utility code to save model to disk
+    Utility code to save model and state to disk
     """
     save_dict = dict({'model': net.state_dict(), 'optim': optimizer.state_dict(), 'epoch': dl.epoch, 'iter':dl.iterInd, 'summaries':all_summaries, 'article':article_string, 'abstract_gold':abs_string})
     print '\n','-' * 60

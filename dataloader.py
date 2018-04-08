@@ -187,7 +187,9 @@ class dataloader():
 		return batchData
 
 	def getEvalBatch(self, num_samples=1):
-		# select first sample for eval
+		"""
+		select first sample for eval
+		"""		
 		data = [self.test_data[i] for i in range(num_samples)]
 		batchData = self.evalPreproc(data[0])
 		return batchData
@@ -195,6 +197,7 @@ class dataloader():
 	def evalPreproc(self, sample):
 		# sample length = 1
 		# limit max article size to 400 tokens
+		# TODO: Kinda strange why say Batch in all when supports only one sample
 		extIntArticles, intRevArticles = [], []
 		max_article_oov = 0
 		article = sample['article'].split(' ')
@@ -225,7 +228,7 @@ class dataloader():
 			return self.evalPreproc(data)
 
 		elif isinstance(index, int) and (index>=0 and index < self.testSamples):
-			data =	self.test_data[index]
+			data = self.test_data[index]
 			return self.evalPreproc(data)
 
 	def getInputTextSample(self, tokenized_text):
