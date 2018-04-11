@@ -31,7 +31,7 @@ class Encoder(Module):
         self.hidden_size = hidden_size
         self.num_layers = 1
         self.word_embed = wordEmbed
-        self.fwd_rnn = LSTM(self.input_sizeopt, self.hidden_size, batch_first=True)
+        self.fwd_rnn = LSTM(self.input_size, self.hidden_size, batch_first=True)
         # self.fwd_rnn = DataParallel(self.fwd_rnn)
         self.bkwd_rnn = LSTM(self.input_size, self.hidden_size, batch_first=True)
         # self.bkwd_rnn = DataParallel(self.bkwd_rnn)
@@ -39,7 +39,7 @@ class Encoder(Module):
         self.output_cproj = DataParallel(self.output_cproj)
         self.output_hproj = Linear(self.hidden_size * 2, self.hidden_size)
         self.output_hproj = DataParallel(self.output_hproj)
-
+    
     def init_hidden(self, batch_size):
         # Before we've done anything, we dont have any hidden state.
         # Refer to the Pytorch documentation to see exactly
@@ -84,7 +84,6 @@ class Encoder(Module):
             out, self.hidden = self.fwd_rnn(embed_fwd[j].view(1, batch_size, -1), (context, self.hidden[1]) )
             lstm_out[j] = out
             lstm_hidden[j] = self.hidden
-
         # encoder_hidden = self.hidden
         # decoder_hidden = self.init_hidden()
         # decoder_hidden = decoder_hidden + encoder_hidden
