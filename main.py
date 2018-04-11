@@ -19,7 +19,7 @@ parser.add_argument("--vocab-file", dest="vocab_file", help="Path to vocabulary 
 parser.add_argument("--max-abstract-size", dest="max_abstract_size", help="Maximum size of abstract for decoder input", default=110, type=int)
 parser.add_argument("--max-article-size", dest="max_article_size", help="Maximum size of article for encoder input", default=300, type=int)
 parser.add_argument("--num-epochs", dest="epochs", help="Number of epochs", default=10, type=int)
-parser.add_argument("--batch-size", dest="batchSize", help="Mini-batch size", default=32, type=int)
+parser.add_argument("--batch-size", dest="batchSize", help="Mini-batch size", default=10, type=int)
 parser.add_argument("--embed-size", dest="embedSize", help="Size of word embedding", default=300, type=int)
 parser.add_argument("--hidden-size", dest="hiddenSize", help="Size of hidden to model", default=128, type=int)
 
@@ -69,8 +69,8 @@ def displayOutput(all_summaries, article, abstract, article_oov, show_ground_tru
     for i, summary in enumerate(all_summaries):
         # generated_summary = ' '.join([dl.id2word[ind] if ind<=dl.vocabSize else article_oov[ind % dl.vocabSize] for ind in summary])
         try:
-            generated_summary = ' '.join([dl.id2word[ind] if ind<dl.vocabSize else article_oov[ind % dl.vocabSize] for ind in summary])      
-        except: 
+            generated_summary = ' '.join([dl.id2word[ind] if ind<dl.vocabSize else article_oov[ind % dl.vocabSize] for ind in summary])
+        except:
             print 'error in index'
             pass
         print 'GENERATED ABSTRACT #%d : \n' %(i+1), generated_summary

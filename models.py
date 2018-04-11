@@ -39,7 +39,7 @@ class Encoder(Module):
         self.output_cproj = DataParallel(self.output_cproj)
         self.output_hproj = Linear(self.hidden_size * 2, self.hidden_size)
         self.output_hproj = DataParallel(self.output_hproj)
-    
+
     def init_hidden(self, batch_size):
         # Before we've done anything, we dont have any hidden state.
         # Refer to the Pytorch documentation to see exactly
@@ -62,16 +62,16 @@ class Encoder(Module):
         # get mask for location of PAD
         mask = _input.eq(0).detach()
 
-        lstm_hidden = [self.init_hidden(batch_size) for i in range(max_len) ]  
+        lstm_hidden = [self.init_hidden(batch_size) for i in range(max_len) ]
         context, _ =  self.init_hidden(batch_size)
 
         if use_gpu:
-            lstm_out = Variable(torch.zeros(len(sentence), batch_size, self.hidden_size).cuda())
-            input_embeds = input_embeds.cuda()
-            decoder_out = Variable(torch.zeros(len_summary, batch_size, self.hidden_size).cuda())
+            lstm_out = Variable(torch.zeros(len(_input), batch_size, self.hidden_size).cuda())
+            #input_embeds = input_embeds.cuda()
+            #decoder_out = Variable(torch.zeros(len_summary, batch_size, self.hidden_size).cuda())
         else:
-            lstm_out = Variable(torch.zeros(len(sentence), batch_size, self.hidden_size))
-            decoder_out = Variable(torch.zeros(len_summary, batch_size, self.hidden_size))
+            lstm_out = Variable(torch.zeros(len(_input), batch_size, self.hidden_size))
+            #decoder_out = Variable(torch.zeros(len_summary, batch_size, self.hidden_size))
 
         for j in range(max_len):
             #calculate the context
@@ -84,7 +84,7 @@ class Encoder(Module):
             out, self.hidden = self.fwd_rnn(embed_fwd[j].view(1, batch_size, -1), (context, self.hidden[1]) )
             lstm_out[j] = out
             lstm_hidden[j] = self.hidden
-                
+
         # encoder_hidden = self.hidden
         # decoder_hidden = self.init_hidden()
         # decoder_hidden = decoder_hidden + encoder_hidden
