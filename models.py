@@ -77,11 +77,11 @@ class Encoder(Module):
         context, _ =  self.init_hidden(batch_size)
 
         if use_gpu:
-            lstm_out = Variable(torch.zeros(max_len, batch_size, self.hidden_size).cuda())
+            lstm_out = Variable(torch.zeros(batch_size, max_len, self.hidden_size).cuda())
             #input_embeds = input_embeds.cuda()
             #decoder_out = Variable(torch.zeros(len_summary, batch_size, self.hidden_size).cuda())
         else:
-            lstm_out = Variable(torch.zeros(max_len, batch_size, self.hidden_size))
+            lstm_out = Variable(torch.zeros(batch_size, max_len, self.hidden_size))
             #decoder_out = Variable(torch.zeros(len_summary, batch_size, self.hidden_size))
 
         for j in range(max_len):
@@ -104,6 +104,7 @@ class Encoder(Module):
         fwd_state = self.hidden
         # fwd_out, fwd_state = self.fwd_rnn(embed_fwd)
         bkwd_out, bkwd_state = self.bkwd_rnn(embed_rev)
+        print("$$$$$$$$",fwd_out.size(), bkwd_out.size())
         hidden_cat = torch.cat((fwd_out, bkwd_out), 2)
 
         # inverse of mask
