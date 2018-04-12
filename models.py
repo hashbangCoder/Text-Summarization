@@ -66,9 +66,9 @@ class Encoder(Module):
         #rev_input = rev_input.view(max_len, batch_size)
         embed_fwd = self.word_embed(_input)
         embed_rev = self.word_embed(rev_input)
-        print('####################################################')
-        print(embed_fwd.size())
-        print(_input.size())
+        #print('####################################################')
+        #print(embed_fwd.size())
+        #print(_input.size())
         self.hidden = self.init_hidden(batch_size)
         # get mask for location of PAD
         mask = _input.eq(0).detach()
@@ -94,7 +94,7 @@ class Encoder(Module):
 #             print("input dim: {}, hidden_length: {}, context_len: {}".format(input_embeds[j].dim(), self.hidden[0].dim(), context.dim()))
             #print("##############", embed_fwd[:,j,:])
             out, self.hidden = self.fwd_rnn(embed_fwd[:,j,:].contiguous().view(batch_size,1, -1), (context, self.hidden[1]) )
-            lstm_out[j] = out
+            lstm_out[:,j,:] = out
             lstm_hidden[j] = self.hidden
         # encoder_hidden = self.hidden
         # decoder_hidden = self.init_hidden()
@@ -104,7 +104,7 @@ class Encoder(Module):
         fwd_state = self.hidden
         # fwd_out, fwd_state = self.fwd_rnn(embed_fwd)
         bkwd_out, bkwd_state = self.bkwd_rnn(embed_rev)
-        print("$$$$$$$$",fwd_out.size(), bkwd_out.size())
+        #print("$$$$$$$$",fwd_out.size(), bkwd_out.size())
         hidden_cat = torch.cat((fwd_out, bkwd_out), 2)
 
         # inverse of mask
