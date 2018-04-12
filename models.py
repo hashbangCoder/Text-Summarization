@@ -131,7 +131,7 @@ class PointerAttentionDecoder(Module):
         self.v = DataParallel(self.v)
 
         # parameters for p_gen
-        self.w_h = Linear(2 * self.hidden_size, 1)	# double due to concat of BiDi encoder states
+        self.w_h = Linear(2 * self.hidden_size, 1)    # double due to concat of BiDi encoder states
         self.w_s = Linear(self.hidden_size, 1)
         self.w_x = Linear(self.input_size, 1)
         self.w_h = DataParallel(self.w_h)
@@ -163,7 +163,7 @@ class PointerAttentionDecoder(Module):
         article_inds -> modified encoder input with temporary OOV ids for each OOV token
         targets -> decoder targets
         decode -> Boolean flag for train/eval mode
-        """	
+        """    
 
         if decode is True:
             return self.decode(enc_states, enc_final_state, enc_mask, article_inds)
@@ -263,14 +263,14 @@ class PointerAttentionDecoder(Module):
         attn_scores = F.softmax(attn_scores)
 
         context = attn_scores.unsqueeze(1).bmm(enc_states)
-        p_vocab = 	F.softmax(self.V(torch.cat((_h, context.squeeze(1)), 1)))							# output proj calculation
-        p_gen = F.sigmoid(self.w_h(context.squeeze(1)) + self.w_s(_h) + self.w_x(embed_input[:, 0, :]))	# p_gen calculation
+        p_vocab =     F.softmax(self.V(torch.cat((_h, context.squeeze(1)), 1)))                            # output proj calculation
+        p_gen = F.sigmoid(self.w_h(context.squeeze(1)) + self.w_s(_h) + self.w_x(embed_input[:, 0, :]))    # p_gen calculation
         p_gen = p_gen.view(-1, 1)
         weighted_Pvocab = p_gen * p_vocab
         weighted_attn = (1-p_gen)* attn_scores
 
         if self.max_article_oov > 0:
-            ext_vocab = Variable(torch.zeros(batch_size, self.max_article_oov).cuda())					# create OOV (but in-article) zero vectors
+            ext_vocab = Variable(torch.zeros(batch_size, self.max_article_oov).cuda())                    # create OOV (but in-article) zero vectors
             combined_vocab = torch.cat((weighted_Pvocab, ext_vocab), 1)
             del ext_vocab
         else:
@@ -332,8 +332,8 @@ class PointerAttentionDecoder(Module):
             # curr_beam_size <= self.beam_size due to pruning of beams that have terminated
             # adjust enc_states and init_state accordingly
             curr_beam_size = _input.size(0)
-             beam_enc_states = enc_states.expand(curr_beam_size, enc_states.size(1), enc_states.size(2)).contiguous().detach()
-             beam_article_inds = article_inds.expand(curr_beam_size, article_inds.size(1)).detach()
+            beam_enc_states = enc_states.expand(curr_beam_size, enc_states.size(1), enc_states.size(2)).contiguous().detach()
+            beam_article_inds = article_inds.expand(curr_beam_size, article_inds.size(1)).detach()
 
             vocab_probs, next_h, next_c = self.decode_step(beam_enc_states, init_state, _input, enc_mask, beam_article_inds)
 
