@@ -4,7 +4,7 @@ from torch.nn import LSTM, GRU, Linear, LSTMCell, Module, DataParallel
 import torch.nn.functional as F
 import pdb
 from numpy import inf
-
+import numpy as np
 use_gpu = True
 
 
@@ -40,7 +40,7 @@ class Encoder(Module):
         self.output_cproj = DataParallel(self.output_cproj)
         self.output_hproj = Linear(self.hidden_size * 2, self.hidden_size)
         self.output_hproj = DataParallel(self.output_hproj)
-    
+
     def init_hidden(self, batch_size):
         """
          Before we've done anything, we dont have any hidden state.
@@ -62,8 +62,13 @@ class Encoder(Module):
     def forward(self, _input, rev_input):
         """ _input/rev_input is batch_size x len """
         batch_size, max_len = _input.size(0), _input.size(1)
+        #_input = _input.view(max_len,batch_size)
+        #rev_input = rev_input.view(max_len, batch_size)
         embed_fwd = self.word_embed(_input)
         embed_rev = self.word_embed(rev_input)
+        print('####################################################')
+        print(embed_fwd.size())
+        print(_input.size())
         self.hidden = self.init_hidden(batch_size)
         # get mask for location of PAD
         mask = _input.eq(0).detach()
@@ -87,7 +92,8 @@ class Encoder(Module):
                     context = context + lstm_hidden[j-2**k][0]
             #forward pass into the encoder
 #             print("input dim: {}, hidden_length: {}, context_len: {}".format(input_embeds[j].dim(), self.hidden[0].dim(), context.dim()))
-            out, self.hidden = self.fwd_rnn(embed_fwd[j].view(1, batch_size, -1), (context, self.hidden[1]) )
+            #print("##############", embed_fwd[:,j,:])
+            out, self.hidden = self.fwd_rnn(embed_fwd[:,j,:].contiguous().view(batch_size,1, -1), (context, self.hidden[1]) )
             lstm_out[j] = out
             lstm_hidden[j] = self.hidden
         # encoder_hidden = self.hidden
@@ -163,7 +169,7 @@ class PointerAttentionDecoder(Module):
         article_inds -> modified encoder input with temporary OOV ids for each OOV token
         targets -> decoder targets
         decode -> Boolean flag for train/eval mode
-        """    
+        """
 
         if decode is True:
             return self.decode(enc_states, enc_final_state, enc_mask, article_inds)
