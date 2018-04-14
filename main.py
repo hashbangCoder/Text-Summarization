@@ -73,7 +73,7 @@ def displayOutput(all_summaries, article, abstract, article_oov, show_ground_tru
             print 'GENERATED ABSTRACT #%d : \n' %(i+1), generated_summary
         except:
             print '^^^^^^error in index^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^', '\n vocab len :', dl.vocabSize
-            print '\n OOV length', len(article_oov), '\n' [ind for ind in summary]
+            print '\n OOV length', len(article_oov), '\n', [ind for ind in summary]
             pass
     print '*' * 80
     return
