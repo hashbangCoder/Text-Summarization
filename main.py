@@ -70,10 +70,10 @@ def displayOutput(all_summaries, article, abstract, article_oov, show_ground_tru
         # generated_summary = ' '.join([dl.id2word[ind] if ind<=dl.vocabSize else article_oov[ind % dl.vocabSize] for ind in summary])
         try:
             generated_summary = ' '.join([dl.id2word[ind] if ind<dl.vocabSize else article_oov[ind % dl.vocabSize] for ind in summary])
+            print 'GENERATED ABSTRACT #%d : \n' %(i+1), generated_summary
         except:
-            print 'error in index'
+            print '^^^^^^error in index^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^'
             pass
-        print 'GENERATED ABSTRACT #%d : \n' %(i+1), generated_summary
     print '*' * 80
     return
 
