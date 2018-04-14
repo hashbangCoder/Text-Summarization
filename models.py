@@ -5,7 +5,7 @@ import torch.nn.functional as F
 import pdb
 from numpy import inf
 import numpy as np
-use_gpu = True
+# use_gpu = True
 
 
 # idea similar to https://github.com/abisee/pointer-generator/blob/master/beam_search.py
@@ -49,13 +49,14 @@ class Encoder(Module):
          The axes semantics are (num_layers, minibatch_size, hidden_size)
          return (ht,ct)
         """
-
-        if use_gpu:
-            var = (Variable(torch.zeros(self.num_layers, batch_size, self.hidden_size).cuda()),
+        var = (Variable(torch.zeros(self.num_layers, batch_size, self.hidden_size).cuda()),
                 Variable(torch.zeros(self.num_layers, batch_size, self.hidden_size).cuda()))
-        else:
-            var = (Variable(torch.zeros(self.num_layers, batch_size, self.hidden_size)),
-                Variable(torch.zeros(self.num_layers, batch_size, self.hidden_size)))
+        # if use_gpu:
+        #     var = (Variable(torch.zeros(self.num_layers, batch_size, self.hidden_size).cuda()),
+        #         Variable(torch.zeros(self.num_layers, batch_size, self.hidden_size).cuda()))
+        # else:
+        #     var = (Variable(torch.zeros(self.num_layers, batch_size, self.hidden_size)),
+        #         Variable(torch.zeros(self.num_layers, batch_size, self.hidden_size)))
         return var
 
 
@@ -70,20 +71,27 @@ class Encoder(Module):
         #print(embed_fwd.size())
         #print(_input.size())
         self.hidden = self.init_hidden(batch_size)
+        self.hidden_rev = self.init_hidden(batch_size)
         # get mask for location of PAD
         mask = _input.eq(0).detach()
 
+        # Reuse them for both forward and backward
         lstm_hidden = [self.init_hidden(batch_size) for i in range(max_len) ]
         context, _ =  self.init_hidden(batch_size)
 
-        if use_gpu:
-            lstm_out = Variable(torch.zeros(batch_size, max_len, self.hidden_size).cuda())
-            #input_embeds = input_embeds.cuda()
-            #decoder_out = Variable(torch.zeros(len_summary, batch_size, self.hidden_size).cuda())
-        else:
-            lstm_out = Variable(torch.zeros(batch_size, max_len, self.hidden_size))
-            #decoder_out = Variable(torch.zeros(len_summary, batch_size, self.hidden_size))
+        # lstm_hidden_rev = [self.init_hidden(batch_size) for i in range(max_len) ]
 
+        lstm_out = Variable(torch.zeros(batch_size, max_len, self.hidden_size).cuda())
+        lstm_out_rev = Variable(torch.zeros(batch_size, max_len, self.hidden_size).cuda())
+        # if use_gpu:
+        #     lstm_out = Variable(torch.zeros(batch_size, max_len, self.hidden_size).cuda())
+        #     #input_embeds = input_embeds.cuda()
+        #     #decoder_out = Variable(torch.zeros(len_summary, batch_size, self.hidden_size).cuda())
+        # else:
+        #     lstm_out = Variable(torch.zeros(batch_size, max_len, self.hidden_size))
+        #     #decoder_out = Variable(torch.zeros(len_summary, batch_size, self.hidden_size))
+
+        #FORWARD
         for j in range(max_len):
             #calculate the context
             context = context*0
@@ -103,7 +111,24 @@ class Encoder(Module):
         fwd_out = lstm_out
         fwd_state = self.hidden
         # fwd_out, fwd_state = self.fwd_rnn(embed_fwd)
-        bkwd_out, bkwd_state = self.bkwd_rnn(embed_rev)
+
+        #BACKWARD
+        for j in range(max_len):
+            #calculate the context
+            context = context*0
+            if j>0:
+                for k in range(int(np.log2(j)) + 1):
+                    context = context + lstm_hidden[j-2**k][0]
+            #forward pass into the encoder
+            #print("input dim: {}, hidden_length: {}, context_len: {}".format(input_embeds[j].dim(), self.hidden[0].dim(), context.dim()))
+            #print("##############", embed_fwd[:,j,:])
+            out, self.hidden_rev = self.bkwd_rnn(embed_rev[:,j,:].contiguous().view(batch_size,1, -1), (context, self.hidden_rev[1]) )
+            lstm_out_rev[:,j,:] = out
+            lstm_hidden[j] = self.hidden_rev
+        
+        bkwd_out = lstm_out_rev
+        bkwd_state = self.hidden_rev
+        # bkwd_out, bkwd_state = self.bkwd_rnn(embed_rev)
         #print("$$$$$$$$",fwd_out.size(), bkwd_out.size())
         hidden_cat = torch.cat((fwd_out, bkwd_out), 2)
 
