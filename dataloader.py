@@ -5,6 +5,7 @@ from itertools import groupby
 from tqdm import tqdm
 import pdb
 import numpy as np
+import random
 
 class dataloader():
 	def __init__(self, batchSize, epochs, vocab, train_path, test_path, max_article_size=400, max_abstract_size=140, test_mode=False):
@@ -189,8 +190,9 @@ class dataloader():
 	def getEvalBatch(self, num_samples=1):
 		"""
 		select first sample for eval
+		TODO : DO random here.t
 		"""		
-		data = [self.test_data[i] for i in range(num_samples)]
+		data = [self.test_data[random.randint(1,101)] for i in range(num_samples)]
 		batchData = self.evalPreproc(data[0])
 		return batchData
 
