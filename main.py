@@ -69,10 +69,11 @@ def displayOutput(all_summaries, article, abstract, article_oov, show_ground_tru
     for i, summary in enumerate(all_summaries):
         # generated_summary = ' '.join([dl.id2word[ind] if ind<=dl.vocabSize else article_oov[ind % dl.vocabSize] for ind in summary])
         try:
-            generated_summary = ' '.join([dl.id2word[ind] if ind<dl.vocabSize else article_oov[ind % dl.vocabSize] for ind in summary])
+            generated_summary = ' '.join([dl.id2word[ind] if ind<=dl.vocabSize else article_oov[ind % dl.vocabSize - 1] for ind in summary])
             print 'GENERATED ABSTRACT #%d : \n' %(i+1), generated_summary
         except:
-            print '^^^^^^error in index^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^'
+            print '^^^^^^error in index^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^', '\n vocab len :', dl.vocabSize
+            print '\n OOV length', len(article_oov), '\n' [ind for ind in summary]
             pass
     print '*' * 80
     return
