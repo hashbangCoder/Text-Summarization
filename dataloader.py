@@ -235,7 +235,7 @@ class dataloader():
 
 	def getInputTextSample(self, tokenized_text):
 		"""
-		Used in Evaluating phase
+		Used in Evaluating phase for testing out Fresh Articles.
 		"""
 		extIntArticles, intRevArticles = [], []
 		max_article_oov = 0

@@ -32,6 +32,7 @@ parser.add_argument("--print-ground-truth", dest="print_ground_truth", help="Pri
 
 parser.add_argument("--load-model", dest="load_model", help="Directory from which to load trained models", default=None, type=str)
 parser.add_argument("--article", dest="article_path", help="Path to article text file", default=None, type=str)
+parser.add_argument("--num-eval", dest="num_eval", help="num of times to evaluate", default = 10, type=int)
 # Note that the parameters of the saved model should match the ones passed.
 opt = parser.parse_args()
 vis = Visdom()
@@ -100,15 +101,16 @@ print '\n','*'*30, 'LOADED WEIGHTS FROM MODEL FILE : %s' %opt.load_model,'*'*30
 net.eval()
 print '\nSetting Model to Evaluation Mode\n'
 
-# Run x times to get x random test data samples for output
-for _ in range(5):
+# Run num_eval times to get num_eval random test data samples for output
+for _ in range(opt.num_eval):
     # If article file provided
     if opt.article_path is not None and os.path.isfile(opt.article_path):
         with open(opt.article_path,'r') as f:
             article_string = f.read().strip()
             article_tokenized = word_tokenize(article_string)
+            print article_tokenized
         _article, _revArticle,  _extArticle, max_article_oov, article_oov = dl.getInputTextSample(article_tokenized)
-        abs_string = '**No abstract available**'
+        abs_string = 'Fresh Article : **No abstract available**'
     else:
     # pull random test sample
         data_batch = dl.getEvalSample()
