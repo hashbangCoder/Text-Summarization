@@ -32,40 +32,44 @@ parser.add_argument("--print-ground-truth", dest="print_ground_truth", help="Pri
 
 parser.add_argument("--load-model", dest="load_model", help="Directory from which to load trained models", default=None, type=str)
 parser.add_argument("--article", dest="article_path", help="Path to article text file", default=None, type=str)
-
+parser.add_argument("--num-eval", dest="num_eval", help="num of times to evaluate", default = 10, type=int)
+# Note that the parameters of the saved model should match the ones passed.
 opt = parser.parse_args()
 vis = Visdom()
 
 assert opt.load_model is not None and os.path.isfile(opt.vocab_file), 'Invalid Path to trained model file'
 
 
-### utility code for displaying generated abstract
-def displayOutput(all_summaries, article, abstract, article_oov, show_ground_truth=True):    
-    special_tokens = ['<s>','<go>','<end>','</s>']
-    print '*' * 150
+def displayOutput(all_summaries, article, abstract, article_oov, show_ground_truth=False):
+    """
+    Utility code for displaying generated abstract/multiple abstracts from beam search
+    """
+    print '*' * 80
     print '\n'
     if show_ground_truth:
         print 'ARTICLE TEXT : \n', article
         print 'ACTUAL ABSTRACT : \n', abstract
-    for i, summary in enumerate(all_summaries):    
-        generated_summary = ' '.join([dl.id2word[ind] if ind<=dl.vocabSize else article_oov[ind % dl.vocabSize] for ind in summary])
-        for token in special_tokens:
-            generated_summary.replace(token, '')
-        print 'GENERATED ABSTRACT #%d : \n' %(i+1), generated_summary    
-    print '*' * 150
+    for i, summary in enumerate(all_summaries):
+        # generated_summary = ' '.join([dl.id2word[ind] if ind<=dl.vocabSize else article_oov[ind % dl.vocabSize] for ind in summary])
+        try:
+            generated_summary = ' '.join([dl.id2word[ind] if ind<=dl.vocabSize else article_oov[ind % dl.vocabSize - 1] for ind in summary])
+            print 'GENERATED ABSTRACT #%d : \n' %(i+1), generated_summary
+        except:
+            print '^^^^^^error in index^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^', '\n vocab len :', dl.vocabSize
+            print '\n OOV length', len(article_oov), '\n', [ind for ind in summary]
+            pass
+    print '*' * 80
     return
 
-# Utility code to save model to disk
-def save_model(net, optimizer,all_summaries, article_string, abs_string):
-    save_dict = dict({'model': net.state_dict(), 'optim': optimizer.state_dict(), 'epoch': dl.epoch, 'iter':dl.iterInd, 'summaries':all_summaries, 'article':article_string, 'abstract_gold':abs_string})
-    print '\n','-' * 60
-    print 'Saving Model to : ', opt.save_dir
-    save_name = opt.save_dir + 'savedModel_E%d_%d.pth' % (dl.epoch, dl.iterInd)
-    torch.save(save_dict, save_name)
-    print '-' * 60  
-    return
-
-
+# Utility code to save model to disk # Not needed here.
+# def save_model(net, optimizer,all_summaries, article_string, abs_string):
+#     save_dict = dict({'model': net.state_dict(), 'optim': optimizer.state_dict(), 'epoch': dl.epoch, 'iter':dl.iterInd, 'summaries':all_summaries, 'article':article_string, 'abstract_gold':abs_string})
+#     print '\n','-' * 60
+#     print 'Saving Model to : ', opt.save_dir
+#     save_name = opt.save_dir + 'savedModel_E%d_%d.pth' % (dl.epoch, dl.iterInd)
+#     torch.save(save_dict, save_name)
+#     print '-' * 60  
+#     return
 
 assert opt.trunc_vocab <= 50000, 'Invalid value for --truncate-vocab'
 assert os.path.isfile(opt.vocab_file), 'Invalid Path to vocabulary file'
@@ -74,6 +78,7 @@ with open(opt.vocab_file) as f:
     vocab = [item[0] for item in vocab[:-(5+ 50000 - opt.trunc_vocab)]]             # Truncate vocabulary to conserve memory
 vocab += ['<unk>', '<go>', '<end>', '<s>', '</s>']                                  # add special token to vocab to bring total count to 50k
 
+#Create an object of the Dataloader class.
 dl = dataloader.dataloader(opt.batchSize, None, vocab, opt.train_file, opt.test_file, 
                           opt.max_article_size, opt.max_abstract_size, test_mode=True)
 
@@ -94,17 +99,18 @@ print '\n','*'*30, 'LOADED WEIGHTS FROM MODEL FILE : %s' %opt.load_model,'*'*30
 # Set model to eval mode
 ############################################################################################
 net.eval()
-print '\n\n'
+print '\nSetting Model to Evaluation Mode\n'
 
-# Run x times to get x random test data samples for output
-for _ in range(5):
+# Run num_eval times to get num_eval random test data samples for output
+for _ in range(opt.num_eval):
     # If article file provided
     if opt.article_path is not None and os.path.isfile(opt.article_path):
         with open(opt.article_path,'r') as f:
             article_string = f.read().strip()
             article_tokenized = word_tokenize(article_string)
+            print article_tokenized
         _article, _revArticle,  _extArticle, max_article_oov, article_oov = dl.getInputTextSample(article_tokenized)
-        abs_string = '**No abstract available**'
+        abs_string = 'Fresh Article : **No abstract available**'
     else:
     # pull random test sample
         data_batch = dl.getEvalSample()
@@ -117,4 +123,4 @@ for _ in range(5):
 
     displayOutput(all_summaries, article_string, abs_string, article_oov, show_ground_truth=opt.print_ground_truth)
 
-
+# TODO: Evalute for ROUGE Scores
