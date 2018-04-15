@@ -23,10 +23,10 @@ parser.add_argument("--batch-size", dest="batchSize", help="Mini-batch size", de
 parser.add_argument("--embed-size", dest="embedSize", help="Size of word embedding", default=300, type=int)
 parser.add_argument("--hidden-size", dest="hiddenSize", help="Size of hidden to model", default=128, type=int)
 
-parser.add_argument("--learning-rate", dest="lr", help="Learning Rate", default=0.001, type=float)
+parser.add_argument("--learning-rate", dest="lr", help="Learning Rate", default=0.1, type=float)
 parser.add_argument("--lambda", dest="lmbda", help="Hyperparameter for auxillary cost", default=1, type=float)
 parser.add_argument("--beam-size", dest="beam_size", help="beam size for beam search decoding", default=4, type=int)
-parser.add_argument("--max-decode", dest="max_decode", help="Maximum length of decoded output", default=40, type=int)
+parser.add_argument("--max-decode", dest="max_decode", help="Maximum length of decoded output", default=60, type=int)
 parser.add_argument("--grad-clip", dest="grad_clip", help="Clip gradients of RNN model", default=2, type=float)
 parser.add_argument("--truncate-vocab", dest="trunc_vocab", help="size of truncated Vocabulary <= 50000 [to save memory]", default=50000, type=int)
 parser.add_argument("--bootstrap", dest="bootstrap", help="Bootstrap word embeds with GloVe?", default=0, type=int)
@@ -121,7 +121,8 @@ net = models.SummaryNet(opt.embedSize, opt.hiddenSize, dl.vocabSize, wordEmbed,
                        start_id=dl.word2id['<go>'], stop_id=dl.word2id['<end>'], unk_id=dl.word2id['<unk>'],
                        max_decode=opt.max_decode, beam_size=opt.beam_size, lmbda=opt.lmbda)
 net = net.cuda()
-optimizer = torch.optim.Adam(net.parameters(), lr=opt.lr)
+#optimizer = torch.optim.Adam(net.parameters(), lr=opt.lr)
+optimizer = torch.optim.Adagrad(net.parameters(), lr=opt.lr)
 
 if opt.load_model is not None and os.path.isfile(opt.load_model):
     saved_file = torch.load(opt.load_model)
