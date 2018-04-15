@@ -114,6 +114,7 @@ if opt.bootstrap:
 else:
     # learn embeddings from scratch (default)
     wordEmbed = torch.nn.Embedding(len(vocab) + 1, opt.embedSize, 0)
+# **************************************************************************************************
 
 print 'Building and initializing SummaryNet...'
 net = models.SummaryNet(opt.embedSize, opt.hiddenSize, dl.vocabSize, wordEmbed,
@@ -172,7 +173,7 @@ while dl.epoch <= opt.epochs:
     # save losses periodically
     if dl.iterInd % 50:
         all_loss.append(batch_loss.cpu().data.tolist()[0])
-        title = 'Pointer Model with Coverage'
+        title = 'Residual Logirithmic LSTM'
         if win is None:
             win = vis.line(Y=np.array(all_loss), X=np.arange(1, len(all_loss)+1), opts=dict(title=title, xlabel='#Mini-Batches (x%d)' %(opt.batchSize),
                            ylabel='Train-Loss'))
@@ -184,8 +185,8 @@ while dl.epoch <= opt.epochs:
         all_summaries, article_string, abs_string, article_oov = evalModel(net)
         displayOutput(all_summaries, article_string, abs_string, article_oov, show_ground_truth=opt.print_ground_truth)
 
-    #if dl.epoch > 1 and dl.iterInd == 0:
-        if dl.iterInd % (6*opt.eval_freq) < opt.batchSize and dl.iterInd > opt.batchSize:
-            save_model(net, optimizer, all_summaries, article_string, abs_string)
+    # Saving the Model : Frequency is 5 times that of Evaluating
+    if dl.iterInd % (5*opt.eval_freq) < opt.batchSize and dl.iterInd > opt.batchSize:
+        save_model(net, optimizer, all_summaries, article_string, abs_string)
 
     del batch_loss, batchArticles, batchExtArticles, batchRevArticles, batchAbstracts, batchTargets
