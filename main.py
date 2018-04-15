@@ -190,7 +190,7 @@ while dl.epoch <= opt.epochs:
         displayOutput(all_summaries, article_string, abs_string, article_oov, show_ground_truth=opt.print_ground_truth)
 
     # Saving the Model : Frequency is 5 times that of Evaluating
-    if dl.iterInd % (1*opt.eval_freq) < opt.batchSize and dl.iterInd > opt.batchSize:
+    if dl.iterInd % (5*opt.eval_freq) < opt.batchSize and dl.iterInd > opt.batchSize:
         save_model(net, optimizer, all_summaries, article_string, abs_string)
 
     del batch_loss, batchArticles, batchExtArticles, batchRevArticles, batchAbstracts, batchTargets
