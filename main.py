@@ -18,15 +18,15 @@ parser.add_argument("--vocab-file", dest="vocab_file", help="Path to vocabulary 
 
 parser.add_argument("--max-abstract-size", dest="max_abstract_size", help="Maximum size of abstract for decoder input", default=110, type=int)
 parser.add_argument("--max-article-size", dest="max_article_size", help="Maximum size of article for encoder input", default=300, type=int)
-parser.add_argument("--num-epochs", dest="epochs", help="Number of epochs", default=10, type=int)
-parser.add_argument("--batch-size", dest="batchSize", help="Mini-batch size", default=10, type=int)
-parser.add_argument("--embed-size", dest="embedSize", help="Size of word embedding", default=300, type=int)
+parser.add_argument("--num-epochs", dest="epochs", help="Number of epochs", default=6, type=int)
+parser.add_argument("--batch-size", dest="batchSize", help="Mini-batch size", default=16, type=int)
+parser.add_argument("--embed-size", dest="embedSize", help="Size of word embedding", default=256, type=int)
 parser.add_argument("--hidden-size", dest="hiddenSize", help="Size of hidden to model", default=128, type=int)
 
-parser.add_argument("--learning-rate", dest="lr", help="Learning Rate", default=0.1, type=float)
+parser.add_argument("--learning-rate", dest="lr", help="Learning Rate", default=0.001, type=float)
 parser.add_argument("--lambda", dest="lmbda", help="Hyperparameter for auxillary cost", default=1, type=float)
 parser.add_argument("--beam-size", dest="beam_size", help="beam size for beam search decoding", default=4, type=int)
-parser.add_argument("--max-decode", dest="max_decode", help="Maximum length of decoded output", default=60, type=int)
+parser.add_argument("--max-decode", dest="max_decode", help="Maximum length of decoded output", default=80, type=int)
 parser.add_argument("--grad-clip", dest="grad_clip", help="Clip gradients of RNN model", default=2, type=float)
 parser.add_argument("--truncate-vocab", dest="trunc_vocab", help="size of truncated Vocabulary <= 50000 [to save memory]", default=50000, type=int)
 parser.add_argument("--bootstrap", dest="bootstrap", help="Bootstrap word embeds with GloVe?", default=0, type=int)
@@ -121,8 +121,8 @@ net = models.SummaryNet(opt.embedSize, opt.hiddenSize, dl.vocabSize, wordEmbed,
                        start_id=dl.word2id['<go>'], stop_id=dl.word2id['<end>'], unk_id=dl.word2id['<unk>'],
                        max_decode=opt.max_decode, beam_size=opt.beam_size, lmbda=opt.lmbda)
 net = net.cuda()
-#optimizer = torch.optim.Adam(net.parameters(), lr=opt.lr)
-optimizer = torch.optim.Adagrad(net.parameters(), lr=opt.lr)
+optimizer = torch.optim.Adam(net.parameters(), lr=opt.lr)
+#optimizer = torch.optim.Adagrad(net.parameters(), lr=opt.lr)
 
 if opt.load_model is not None and os.path.isfile(opt.load_model):
     saved_file = torch.load(opt.load_model)
@@ -187,7 +187,7 @@ while dl.epoch <= opt.epochs:
         displayOutput(all_summaries, article_string, abs_string, article_oov, show_ground_truth=opt.print_ground_truth)
 
     # Saving the Model : Frequency is 5 times that of Evaluating
-    if dl.iterInd % (5*opt.eval_freq) < opt.batchSize and dl.iterInd > opt.batchSize:
+    if dl.iterInd % (1*opt.eval_freq) < opt.batchSize and dl.iterInd > opt.batchSize:
         save_model(net, optimizer, all_summaries, article_string, abs_string)
 
     del batch_loss, batchArticles, batchExtArticles, batchRevArticles, batchAbstracts, batchTargets
